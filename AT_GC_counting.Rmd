@@ -1,0 +1,364 @@
+---
+title: "AT_GC_counting"
+author: "Nobuhiko Hamazaki"
+date: "2018/3/20"
+output: html_document
+---
+
+# Expression and Promoter nucleotide composition
+This script plots relevance between gene expression and promoter nucleotide composition (AT/GC).
+
+```{r message=FALSE}
+# loding libraries
+library(Biostrings)     # Provides DNAString, DNAStringSet, etc
+library(BSgenome)       # Provides getSeq()
+library(GenomicRanges)  # Provides GRanges, etc
+library(rtracklayer)    # Provides import() and export()
+library(org.Mm.eg.db)
+library(AnnotationDbi)
+library(tidyverse)
+library(lemon)
+library(seqPattern)
+
+```
+
+
+```{r}
+##############
+############## reference data ############
+# retrieving GRange object of mm10
+# BiocManager::install("TxDb.Mmusculus.UCSC.mm10.knownGene")
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+# loading mm10 genome
+# BiocManager::install("BSgenome.Mmusculus.UCSC.mm10")
+library(BSgenome.Mmusculus.UCSC.mm10)
+# load transcript GRange object
+Txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+# Retrieving gene GRange
+mm10_genes <- genes(Txdb)
+# Retrieving all promter GRange
+mm10_promoters <- promoters(mm10_genes, upstream = 100, downstream = 0) # <- promoter range
+
+mm10_promoters_50nt <- promoters(mm10_genes, upstream = 50, downstream = 0)
+
+### get sequences for all the promoters (100 nt sequences)
+all.promoter_seq <- getSeq(Mmusculus, mm10_promoters)
+
+##########################################
+
+
+# loading MEs genes
+# loading expression tale
+df <- read.table("All.MEs_expression.csv", header = T, sep = ",", check.names = F)
+
+# rename colnames
+colnames(df) <- c("Geneid", colnames(df[,-1]))
+mygenes <- as.character(df$Geneid)
+
+# Retrieving Entrez_id of your genes of interest
+g.ids <- AnnotationDbi::select(org.Mm.eg.db, keys=mygenes,columns=c("ENTREZID"), keytype="ALIAS")
+
+
+
+#### since we have a one-to-many mapping, the match function gave us the first match i.e. just taking the first match in the g.ids object.
+idx <- match(mygenes, g.ids$ALIAS)
+
+no.dup.g.ids <- g.ids[idx,]
+
+n.d.df <- cbind(df, no.dup.g.ids) 
+
+# extracting promoter GRange object of your genes by Entrez id 
+goi_pro <- subset(mm10_promoters, gene_id %in% no.dup.g.ids$ENTREZID)
+
+### get promoter sequences (DNA string) for goi (+-200 bp sequences in this case)
+promoter_seq <- getSeq(Mmusculus, goi_pro)
+
+#defining motifs of interest(TATA box:TATAWAW)
+TATA <- "TATAWAW"
+
+# Counting each nucleotides in promoter regions
+cA <- vcountPattern("A", promoter_seq, fixed=c(pattern=FALSE, subject=TRUE))
+cC <- vcountPattern("C", promoter_seq, fixed=c(pattern=FALSE, subject=TRUE))
+cG <- vcountPattern("G", promoter_seq, fixed=c(pattern=FALSE, subject=TRUE))
+cT <- vcountPattern("T", promoter_seq, fixed=c(pattern=FALSE, subject=TRUE))
+
+# promoter_seq object
+mcols(promoter_seq)$A_count <- cA
+mcols(promoter_seq)$C_count <- cC
+mcols(promoter_seq)$G_count <- cG
+mcols(promoter_seq)$T_count <- cT
+
+# Merging these count data and Entrez id
+cT_ENTREZ_merge <- data.frame("ENTREZid"=names(promoter_seq), 
+                              "A_count"=mcols(promoter_seq)$A_count,
+                              "T_count"=mcols(promoter_seq)$T_count,
+                              "G_count"=mcols(promoter_seq)$G_count,
+                              "C_count"=mcols(promoter_seq)$C_count) 
+
+idx2 <- match(cT_ENTREZ_merge$ENTREZid, n.d.df$ENTREZID) 
+
+MEdf_cT <- cbind(cT_ENTREZ_merge , n.d.df[idx2, ])
+
+
+# long formatting
+long_ME <- MEdf_cT[,2:(length(MEdf_cT)-2)] %>% gather(key = stage, value = RPKM, -moduleColors, -Geneid, -A_count, -T_count, -G_count, -C_count )
+
+
+
+#############  Z-score
+zscore <- scale(t(MEdf_cT[,7:(length(MEdf_cT)-3)])) %>% t() 
+
+zME <- cbind(MEdf_cT[,2:6], zscore)
+
+long_zME <- zME %>% gather(key = stage, value = Z.score, -Geneid, -A_count, -T_count, -G_count, -C_count)
+
+long_zME$TA_count <- (long_zME$A_count + long_zME$T_count)
+
+
+### dot plot of AT_GC
+# Converting long format by gathering the expression table
+long_df <- MEdf_cT[,2:(length(MEdf_cT)-2)] %>% gather(key = stage, value = RPKM, -moduleColors, -Geneid, -A_count, -T_count, -G_count, -C_count )
+
+
+
+### Counting ATs
+AT_high <- long_df[long_df$A_count + long_df$T_count > median(long_df$A_count + long_df$T_count) + 10,]
+AT_low <- long_df[long_df$A_count + long_df$T_count < median(long_df$A_count + long_df$T_count) - 10,]
+
+mZ_AT_high <- AT_high %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_RPKM = mean(RPKM))
+
+mZ_AT_low <- AT_low %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_RPKM = mean(RPKM))
+
+# dividing high values by low value
+AT_hi_lo <- data_frame(Promoter_nucleotide = "AT", stage = mZ_AT_high$stage , high_per_low = (mZ_AT_high$mean_RPKM-mZ_AT_low$mean_RPKM) )
+
+# scaling
+AT_hi_lo$high_per_low <- scale(AT_hi_lo$high_per_low)
+
+### Counting GC
+GC_high <- long_df[long_df$G_count + long_df$C_count > median(long_df$G_count + long_df$C_count) + 10,]
+
+GC_low <- long_df[long_df$G_count + long_df$C_count < median(long_df$G_count + long_df$C_count) - 10,]
+
+mZ_GC_high <- GC_high %>% na.omit() %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_RPKM = mean(RPKM))
+
+
+mZ_GC_low <- GC_low %>%na.omit() %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_RPKM = mean(RPKM))
+
+# dividing high values by low value
+GC_hi_lo <- data_frame(Promoter_nucleotide = "GC", stage = mZ_GC_high$stage , high_per_low = (mZ_GC_high$mean_RPKM - mZ_GC_low$mean_RPKM) )
+
+# scaling
+GC_hi_lo$high_per_low <- scale(GC_hi_lo$high_per_low)
+
+
+# merging two tables
+ALL_hi_low <- rbind(AT_hi_lo, GC_hi_lo)
+
+# selecting vivo and vitro samples
+vivo_ALL_hi_low <- ALL_hi_low %>% dplyr::filter(stage == "PGC_E14.5" | stage == "PGC_E16.5" | stage == "PGC_E18.5" | stage == "P1_oocyte_small" |  stage == "P3_oocyte_small" | stage == "P6_oocyte_small" | stage == "2nd.fol_vivo" | stage == "Incomp.GV_vivo" | stage == "Comp.GV_vivo" | stage == "MII_vivo"| stage == "2-cell")
+
+vitro_ALL_hi_low <- ALL_hi_low %>% dplyr::filter(stage == "ESCS" | stage == "PGCLC_d6" | stage == "IVD_D3" | stage == "IVD_D5" |  stage == "IVD_D9" |  stage == "IVD_D10" | stage == "IVD_D11" | stage == "IVD_D13" | stage == "IVD_D15" | stage == "IVD_D17" | stage == "IVD_D20"| stage == "MII_vitro")
+
+
+### Reorder X axis
+vivo_ALL_hi_low$stage <- factor(vivo_ALL_hi_low$stage, levels = colnames(zME))
+vitro_ALL_hi_low$stage <- factor(vitro_ALL_hi_low$stage, levels = colnames(zME))
+
+# plotting
+vivo_ALL_hi_low %>% ggplot(aes(x=stage, y = Promoter_nucleotide)) +
+  geom_point(aes(colour = high_per_low), size = 4) +
+  scale_colour_gradient2(low = "steelblue", mid = "white", high = "red", midpoint = 0) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5, hjust = 1, size = 12), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.text = element_text(size = 8), legend.title = element_text(size = 10), plot.margin= unit(c(7, 1, 1, 1), "lines")) +
+  labs(colour = "high/low" )
+
+vitro_ALL_hi_low %>% ggplot(aes(x=stage, y = Promoter_nucleotide)) +
+  geom_point(aes(colour = high_per_low), size = 4) +
+  scale_colour_gradient2(low = "steelblue", mid = "white", high = "red", midpoint = 0) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5, hjust = 1, size = 12), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.text = element_text(size = 8), legend.title = element_text(size = 10), plot.margin= unit(c(7, 1, 1, 1), "lines")) +
+  labs(colour = "high/low" ) 
+
+
+
+
+```
+    
+    
+    
+
+# AT/GC ratio line plotting
+```{r}
+# parameters
+up <- 100
+down <- 100
+stage1 <- "IVD_D11"
+stage2 <- "IVD_D13"
+fold <- 4
+
+
+##############
+############## reference data ############
+# retrieving GRange object of mm10
+# biocLite("TxDb.Mmusculus.UCSC.mm10.knownGene")
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+# loading mm10 genome
+library(BSgenome.Mmusculus.UCSC.mm10)
+# load transcript GRange object
+Txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+# Retrieving gene GRange
+mm10_genes <- genes(Txdb)
+# Retrieving all promter GRange (100 nt)
+mm10_promoters <- promoters(mm10_genes, upstream = up, downstream = down) 
+
+mm10_promoters_50nt <- promoters(mm10_genes, upstream = 50, downstream = 0) 
+
+### get sequences for all the promoters
+all.promoter_seq <- getSeq(Mmusculus, mm10_promoters)
+
+##########################################
+
+
+# loading MEs genes (generated from "~/Dropbox/Documents_symblink/Oogenesis/CODE/WGCNA for germ line samples.Rmd")
+df <- read.table("All.MEs_expression.csv", header = T, sep = ",", check.names = F)
+
+# rename colnames
+colnames(df) <- c("Geneid", colnames(df[,-1]))
+mygenes <- as.character(df$Geneid)
+
+# Retrieving Entrez_id of your genes of interest
+g.ids <- AnnotationDbi::select(org.Mm.eg.db, keys=mygenes,columns=c("ENTREZID"), keytype="ALIAS")
+
+#### since we have a one-to-many mapping, the match function gave us the first match i.e. just taking the first match in the g.ids object.
+idx <- match(mygenes, g.ids$ALIAS)
+
+no.dup.g.ids <- g.ids[idx,]
+
+n.d.df <- cbind(df, no.dup.g.ids) 
+
+# extracting promoter GRange object of your genes by Entrez id ( instead of ==, here, %in% should be used, otherwise it fails)
+stage1_plus1 <- n.d.df %>% dplyr::select(stage1)  %>% +1 
+stage2_plus1 <- n.d.df %>% dplyr::select(stage2)  %>% +1 
+
+
+# Defining genes based on their expression changes
+up_condition <- stage2_plus1 / stage1_plus1 > fold
+down_condition <- stage2_plus1 / stage1_plus1 < 1/fold
+
+
+up_goi_pro <- subset(mm10_promoters, gene_id %in% n.d.df[up_condition,]$ENTREZID)
+down_goi_pro <- subset(mm10_promoters, gene_id %in% n.d.df[down_condition,]$ENTREZID)
+
+
+### get promoter sequences (DNA string) for goi 
+up_promoter_seq <- getSeq(Mmusculus, up_goi_pro)
+down_promoter_seq <- getSeq(Mmusculus, down_goi_pro)
+
+# count ATGC
+up_letter_counts <- consensusMatrix(up_promoter_seq)
+down_letter_counts <- consensusMatrix(down_promoter_seq)
+class(up_letter_counts)
+
+colnames(up_letter_counts) <- c(-100:-1,1:100)
+
+
+##### Transformation
+up_letters <- up_letter_counts[1:4,] %>% as.data.frame(rownames = "nucleotide") 
+down_letters <- down_letter_counts[1:4,] %>% as.data.frame(rownames = "nucleotide") 
+# Changing col name from-50 to -1
+
+colnames(up_letters) <- c(-up:-1,1:down)
+colnames(down_letters) <- c(-up:-1,1:down)
+
+# transformatting to long format
+up_letter_long <- up_letters %>% as.tibble(rownames = "nucleotide") %>% gather(key = position, value = count, -nucleotide)
+down_letter_long <- down_letters %>% as.tibble(rownames = "nucleotide") %>% gather(key = position, value = count, -nucleotide)
+
+# converting data type of position colum integer
+up_letter_long$position <- as.integer(up_letter_long$position)
+down_letter_long$position <- as.integer(down_letter_long$position)
+
+
+
+### background by all promoter
+letter_counts_all <- consensusMatrix(all.promoter_seq)
+
+letters_all <- letter_counts_all[1:4,] %>% as.data.frame(rownames = "nucleotide") 
+
+colnames(letters_all) <- c(-up:-1,1:down)
+
+letter_all_long <- letters_all %>% as.tibble(rownames = "nucleotide") %>% gather(key = position, value = count, -nucleotide)
+
+letter_all_long$position <- as.integer(letter_all_long$position)
+
+### (A+T)/(G+C) calcuration
+# transformation of tables
+up_t_letters<- t(up_letters) %>% as.data.frame()
+down_t_letters<- t(down_letters) %>% as.data.frame()
+
+# calcurate AT/GC ratio
+up_AT_ratio <-  (up_t_letters$A + up_t_letters$T + 1) / (up_t_letters$G + up_t_letters$C + 1)
+down_AT_ratio <-  (down_t_letters$A + down_t_letters$T + 1) / (down_t_letters$G + down_t_letters$C + 1)
+
+# re-transformation of tables
+up_AT_ratio <- data.frame(up_AT_ratio) %>% t() 
+down_AT_ratio <- data.frame(down_AT_ratio) %>% t() 
+
+# changing col name
+colnames(up_AT_ratio) <-  c(-up:-1,1:down)
+colnames(down_AT_ratio) <-  c(-up:-1,1:down)
+
+# long formatting
+up_AT_ratio_long <- up_AT_ratio %>% as.tibble(rownames = "nucleotide") %>% gather(key = position, value = AT_ratio, -nucleotide)
+down_AT_ratio_long <- down_AT_ratio %>% as.tibble(rownames = "nucleotide") %>% gather(key = position, value = AT_ratio, -nucleotide)
+
+# converting data type of position colum integer
+up_AT_ratio_long$position <- as.integer(up_AT_ratio_long$position)
+down_AT_ratio_long$position <- as.integer(down_AT_ratio_long$position)
+
+##################### ALL promoter
+# transformation
+all_t_letters<- t(letters_all) %>% as.data.frame()
+# calcurating AT/GC ratio
+all_AT_ratio <-  (all_t_letters$A + all_t_letters$T + 1) / (all_t_letters$G + all_t_letters$C + 1)
+# re-transformation
+all_AT_letters <- data.frame(all_AT_ratio) %>% t() 
+# changing col name
+colnames(all_AT_letters) <-  c(-up:-1,1:down)
+# long formatにconvert
+all_AT_ratio_long <- all_AT_letters %>% as.tibble(rownames = "nucleotide") %>% gather(key = position, value = AT_ratio, -nucleotide)
+# converting data type of position colum integer
+all_AT_ratio_long$position <- as.integer(all_AT_ratio_long$position)
+##############################
+
+# Adding col for next merging
+up_AT_ratio_long <- data.frame(up_AT_ratio_long, change = "up") 
+down_AT_ratio_long <- data.frame(down_AT_ratio_long, change = "down") 
+all_AT_ratio_long <- data.frame(all_AT_ratio_long, change = "ALL") 
+
+# Merging
+up_down_all_AT_ratio <- rbind(up_AT_ratio_long, down_AT_ratio_long, all_AT_ratio_long )
+
+# plot
+ggplot(up_down_all_AT_ratio , aes(x=position, y = AT_ratio, group = change, colour = change)) +
+  annotate("rect", xmin=-30, xmax=-20, ymin=-Inf, ymax=Inf, alpha = 0.15, fill = "orange") +
+  geom_line(size = 1) +
+  theme_bw() +
+  theme(panel.grid  = element_blank()) +
+  ylim(0.4, 1.25) + 
+  scale_color_manual(values = c("red2", "cornflowerblue", "black")) 
+
+
+```
+
+
+

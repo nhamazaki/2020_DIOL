@@ -1,0 +1,236 @@
+---
+title: "R001.1_global_DNA_meth_bin100000bp"
+author: "Nobuhiko Hamazaki"
+date: "2019/9/18"
+output: html_document
+---
+
+
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(hexbin)
+library(egg)
+```
+
+
+```{r}
+ES_1 <- read.table("sample-1.cpg.methyl_100000bin.bedGraph", header = F)
+
+ES_2 <- read.table("sample-2.cpg.methyl_100000bin.bedGraph", header = F)
+
+ngDIO_1 <- read.table("sample-3.cpg.methyl_100000bin.bedGraph", header = F)
+  
+ngDIO_2 <- read.table("sample-4.cpg.methyl_100000bin.bedGraph", header = F)
+
+
+fgDIO_1 <- read.table("sample-5.cpg.methyl_100000bin.bedGraph", header = F)
+  
+fgDIO_2 <- read.table("sample-6.cpg.methyl_100000bin.bedGraph", header = F)
+
+
+
+ngO <- read.table("WT_NG_oocytes_merged.cpg.methyl.sorted_100000bin.bedGraph", header = F)
+  
+fgO <- read.table("WT_GV_oocytes_merged.cpg.methyl.sorted_100000bin.bedGraph", header = F)
+  
+colnames(ES_1) <- c("chr", "start", "end", "meth")
+colnames(ES_2) <- c("chr", "start", "end", "meth")
+colnames(ngDIO_1) <- c("chr", "start", "end", "meth")
+colnames(ngDIO_2) <- c("chr", "start", "end", "meth")
+colnames(fgDIO_1) <- c("chr", "start", "end", "meth")
+colnames(fgDIO_2) <- c("chr", "start", "end", "meth")
+colnames(ngO) <- c("chr", "start", "end", "meth")
+colnames(fgO) <- c("chr", "start", "end", "meth")
+
+
+df <- data.frame(ESC_1 = ES_1$meth,
+                 ESC_2 = ES_2$meth,
+                 ngDIO_1 = ngDIO_1$meth,
+                 ngDIO_2 = ngDIO_2$meth, 
+                 fgDIO_1 = fgDIO_1$meth,
+                 fgDIO_2 = fgDIO_2$meth,
+                 ngOocyte = ngO$meth,
+                 fgOocyte = fgO$meth) %>% na.omit() 
+
+
+
+```
+
+
+# Scatter plot
+全組み合わせのscatter
+```{r}
+# example
+gf <- data.frame(df[, c(1,3)], row.names = NULL)
+    
+    x <- densCols(gf[,1], gf[,2], colramp=colorRampPalette(c("black", "white"))) ## Use densCols() output to get density at each point
+    
+    gf$dens <- col2rgb(x)[1,] + 1L
+    
+    gf$dens <- gf$dens / max(gf$dens)
+    
+    # plot
+   gf  %>% ggplot(aes(x = get(colnames(df)[1]), y = get(colnames(df)[3]), colour = dens, alpha = dens)) +
+      geom_point(pch = ".") +
+      scale_color_viridis_c() +
+      xlab(colnames(gf)[1]) +
+      ylab(colnames(gf)[2]) +
+      xlim(0,1) + ylim(0,1) + 
+      theme_bw() 
+
+
+for (i in 1:6) {
+  for (j in 1:6) {
+    
+    gf <- data.frame(df[, c(i,j)], row.names = NULL)
+    
+    x <- densCols(gf[,1], gf[,2], colramp=colorRampPalette(c("black", "white"))) ## Use densCols() output to get density at each point
+    
+    gf$dens <- col2rgb(x)[1,] + 1L
+    
+    gf$dens <- gf$dens / max(gf$dens)
+    
+    # plot
+gf  %>% ggplot(aes(x = get(colnames(df)[i]), y = get(colnames(df)[j]), colour = dens, alpha = dens)) +
+      geom_point(pch = ".") +
+      scale_color_viridis_c() +
+      xlab(colnames(gf)[1]) +
+      ylab(colnames(gf)[2]) +
+      xlim(0,1) + ylim(0,1) + 
+      theme_bw() 
+  }
+}
+
+```
+
+# box plot and violin plot
+```{r}
+# Gather for converting matrix into long-format
+gt_df <- df %>% gather(key = "Stage", value = "Methylation")
+
+# Reorder samples for x-axis
+Order <- c("ESC_1", "ESC_2", "ngDIO_1", "ngDIO_2","ngOocyte","fgOocyte")
+gt_df$Stage <- factor(gt_df$Stage, levels = Order)
+
+# violin plot
+gt_df %>% ggplot(aes(x = Stage, y = Methylation)) +
+  geom_violin()
+
+# box plot
+gt_df %>% ggplot(aes(x = Stage, y = Methylation)) +
+  geom_boxplot()
+  
+```
+
+
+
+
+
+# DNA methylation pattern across chromosome
+```{r}
+g1 <- ES_1 %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth)) +
+  #geom_point(size = 0.1) +
+  stat_smooth(method = "loess", span = 0.002) +
+  ylim(c(0,1)) +
+  ggtitle("ESCs") +
+  theme_classic(base_family = "Helvetica") +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text.x = element_blank())
+  
+
+g2 <- ngDIO_1 %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth)) +
+  #geom_point(size = 0.1) +
+  stat_smooth(method = "loess", span = 0.002) +
+  ylim(c(0,1)) +
+  ggtitle("ngDIOLs") +
+  theme_classic(base_family = "Helvetica") +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text.x = element_blank())
+  
+  
+g3 <- fgDIO_1 %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth)) +
+  #geom_point(size = 0.1)+
+  stat_smooth(method = "loess", span = 0.002) +
+  ylim(c(0,1)) +
+  ggtitle("fgDIOLs") +
+  theme_classic(base_family = "Helvetica") +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text.x = element_blank())
+
+g4 <- ngO %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth)) +
+  #geom_point(size = 0.1)+
+  stat_smooth(method = "loess", span = 0.005) +
+  ylim(c(0,1)) +
+  ggtitle("ngOocytes") +
+  theme_classic(base_family = "Helvetica") +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank(), axis.text.x = element_blank())
+
+g5 <- fgO %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth)) +
+  #geom_point(size = 0.1)+
+  stat_smooth(method = "loess", span = 0.005) +
+  ylim(c(0,1)) +
+  ggtitle("fgOocytes") +
+  theme_classic(base_family = "Helvetica") +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank())
+
+
+ar <- ggarrange(g1, g2, g3, g4, g5, nrow = 5, ncol = 1)
+
+
+```
+
+# layering selected samples
+```{r}
+# layer of selected samples
+
+sample1 <- fgDIO_1  %>% mutate(sample = "fgDIOLs")
+sample2 <- fgO %>% mutate(sample = "fgOocytes")
+gat_samples <- rbind(sample1, sample2)
+
+gat_samples %>%
+  ggplot(aes(start, meth, group = sample, colour = sample)) +
+  facet_wrap(~chr,  scales = "free_x") +
+  stat_smooth(method = "loess", span = 0.005, se = F, size = 0.75, alpha = 0.7) +
+  ylim(c(0,1)) +
+  theme_classic(base_family = "Helvetica") +
+  scale_colour_brewer(palette = "Set1")
+
+
+
+# Chr15
+gat_samples %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth, group = sample, colour = sample)) +
+  stat_smooth(method = "loess", span = 0.005, se = F, size = 0.75, alpha = 0.7) +
+  ylim(c(0,1)) +
+  theme_classic(base_family = "Helvetica") +
+  scale_colour_brewer(palette = "Set1") 
+
+
+  
+  gat_samples %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth, group = sample, colour = sample)) +
+  stat_smooth(method = "loess", span = 0.005, se = F, size = 0.75, alpha = 0.7) +
+  ylim(c(0,1)) +
+  theme_classic(base_family = "Helvetica") +
+  scale_colour_brewer(palette = "Set1") 
+
+    
+  gat_samples %>% dplyr::filter(chr == "chr15") %>%
+  ggplot(aes(start, meth, group = sample, colour = sample)) +
+  stat_smooth(method = "loess", span = 0.005, se = F, size = 0.75, alpha = 0.7) +
+  ylim(c(0,1)) +
+  theme_classic(base_family = "Helvetica") +
+  scale_colour_brewer(palette = "Set1") 
+  
+
+
+```
+
+
+
+

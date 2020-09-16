@@ -1,0 +1,427 @@
+---
+title: "PBAT_R_002_features_methylation"
+author: "Nobuhiko Hamazaki"
+date: "2019/9/18"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(hexbin)
+library(egg)
+library(lemon)
+library(ggbeeswarm)
+
+```
+
+
+# Genebody violin plot
+```{r}
+# reading tables
+ES_1 <- read.table("sample-1.cpg.methyl_genebody.bedGraph", header = F)
+
+ES_2 <- read.table("sample-2.cpg.methyl_genebody.bedGraph", header = F)
+
+ngDIO_1 <- read.table("sample-3.cpg.methyl_genebody.bedGraph", header = F)
+  
+ngDIO_2 <- read.table("sample-4.cpg.methyl_genebody.bedGraph", header = F)
+
+fgDIO_1 <- read.table("sample-5.cpg.methyl_genebody.bedGraph", header = F)
+  
+fgDIO_2 <- read.table("sample-6.cpg.methyl_genebody.bedGraph", header = F)
+  
+ngO <- read.table("WT_NG_oocytes_merged.cpg.methyl.sorted_genebody.bedGraph", header = F)
+  
+fgO <- read.table("WT_GV_oocytes_merged.cpg.methyl.sorted_genebody.bedGraph", header = F)
+  
+
+
+colnames(ES_1) <- c("chr", "start", "end", "name", "meth")
+colnames(ES_2) <- c("chr", "start", "end", "name", "meth")
+colnames(ngDIO_1) <- c("chr", "start", "end","name",  "meth")
+colnames(ngDIO_2) <- c("chr", "start", "end", "name", "meth")
+colnames(fgDIO_1) <- c("chr", "start", "end","name",  "meth")
+colnames(fgDIO_2) <- c("chr", "start", "end", "name", "meth")
+colnames(ngO) <- c("chr", "start", "end", "name", "meth")
+colnames(fgO) <- c("chr", "start", "end", "name", "meth")
+
+df <- data.frame(ESC_1 = ES_1$meth, ESC_2 = ES_2$meth, ngDIO_1 = ngDIO_1$meth, ngDIO_2 = ngDIO_2$meth, fgDIO_1 = fgDIO_1$meth, fgDIO_2 = fgDIO_2$meth,  ngOocyte = ngO$meth, fgOocyte = fgO$meth) %>% na.omit() 
+
+# Gather for converting matrix into long-format
+gt_df <- df %>% gather(key = "Stage", value = "Methylation")
+
+# Reorder samples for x-axis
+Order <- c("ESC_1", "ESC_2", "ngDIO_1", "ngDIO_2", "fgDIO_1", "fgDIO_2", "ngOocyte","fgOocyte")
+gt_df$Stage <- factor(gt_df$Stage, levels = Order)
+
+
+# violin plot
+gt_df %>% ggplot(aes(x = Stage, y = Methylation)) +
+  geom_violin(scale = "width", fill = "magenta4") +
+  scale_color_viridis_d() +
+  ggtitle("Gene body") +
+      ylim(0,1) + xlab("") + 
+      theme_bw() +  
+  theme(text = element_text(colour = "black", family = "Helvetica"),
+        axis.text.x = element_text( hjust = 1, vjust = 0.5, angle = 90)) 
+    
+
+```
+
+
+
+
+
+
+# Promtoer violin plot
+```{r}
+# reading tables
+ES_1 <- read.table("sample-1.cpg.methyl_promoter.bedGraph", header = F)
+
+ES_2 <- read.table("sample-2.cpg.methyl_promoter.bedGraph", header = F)
+
+ngDIO_1 <- read.table("sample-3.cpg.methyl_promoter.bedGraph", header = F)
+  
+ngDIO_2 <- read.table("sample-4.cpg.methyl_promoter.bedGraph", header = F)
+
+fgDIO_1 <- read.table("sample-5.cpg.methyl_promoter.bedGraph", header = F)
+  
+fgDIO_2 <- read.table("sample-6.cpg.methyl_promoter.bedGraph", header = F)
+  
+ngO <- read.table("WT_NG_oocytes_merged.cpg.methyl.sorted_promoter.bedGraph", header = F)
+  
+fgO <- read.table("WT_GV_oocytes_merged.cpg.methyl.sorted_promoter.bedGraph", header = F)
+  
+
+colnames(ES_1) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(ES_2) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(ngDIO_1) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(ngDIO_2) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(fgDIO_1) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(fgDIO_2) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(ngO) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+colnames(fgO) <- c("chr", "start", "end", "name", "cmpl", "strand", "meth")
+
+df <- data.frame(ESC_1 = ES_1$meth, ESC_2 = ES_2$meth, ngDIO_1 = ngDIO_1$meth, ngDIO_2 = ngDIO_2$meth, fgDIO_1 = fgDIO_1$meth, fgDIO_2 = fgDIO_2$meth,  ngOocyte = ngO$meth, fgOocyte = fgO$meth) %>% na.omit() 
+
+
+# Gather for converting matrix into long-format
+gt_df <- df %>% gather(key = "Stage", value = "Methylation")
+
+# Reorder samples for x-axis
+Order <- c("ESC_1", "ESC_2", "ngDIO_1", "ngDIO_2", "fgDIO_1", "fgDIO_2", "ngOocyte", "fgOocyte")
+gt_df$Stage <- factor(gt_df$Stage, levels = Order)
+
+# violin plot
+gt_df %>% ggplot(aes(x = Stage, y = Methylation)) +
+  geom_violin(scale = "width", fill = "skyblue") +
+  ggtitle("Promoter") +
+      ylim(0,1) + xlab("") + 
+      theme_bw() +  
+  theme(text = element_text(colour = "black", family = "Helvetica"),
+        axis.text.x = element_text( hjust = 1, vjust = 0.5, angle = 90)) 
+
+
+
+```
+
+
+
+
+
+# Repeats violin plot
+```{r}
+ES_1 <- read.table("sample-1.cpg.methyl_Repeats.bedGraph", header = F)
+
+ES_2 <- read.table("sample-2.cpg.methyl_Repeats.bedGraph", header = F)
+
+ngDIO_1 <- read.table("sample-3.cpg.methyl_Repeats.bedGraph", header = F)
+  
+ngDIO_2 <- read.table("sample-4.cpg.methyl_Repeats.bedGraph", header = F)
+  
+fgDIO_1 <- read.table("sample-5.cpg.methyl_Repeats.bedGraph", header = F)
+  
+fgDIO_2 <- read.table("sample-6.cpg.methyl_Repeats.bedGraph", header = F)
+  
+ngO <- read.table("WT_NG_oocytes_merged.cpg.methyl.sorted_Repeats.bedGraph", header = F)
+  
+fgO <- read.table("WT_GV_oocytes_merged.cpg.methyl.sorted_Repeats.bedGraph", header = F)
+  
+
+colnames(ES_1) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(ES_2) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(ngDIO_1) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(ngDIO_2) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(fgDIO_1) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(fgDIO_2) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(ngO) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+colnames(fgO) <- c("chr", "start", "end", "Rep_Name", "Rep_Class", "Rep_Family", "meth")
+
+### global meth of repeats
+df <- data.frame(ESC_1 = ES_1$meth, 
+                 ESC_2 = ES_2$meth, 
+                 ngDIO_1 = ngDIO_1$meth, 
+                 ngDIO_2 = ngDIO_2$meth, 
+                # fgDIO_1 = fgDIO_1$meth, 
+                # fgDIO_2 = fgDIO_2$meth, 
+                 ngOocyte = ngO$meth, 
+                # fgOocyte = fgO$meth,
+                 Rep_Name = ES_1$Rep_Name, Rep_Family = ES_1$Rep_Family, Rep_Class = ES_1$Rep_Class) %>% na.omit() 
+
+# gather
+gt_df <- df %>% gather(key = "Stage", value = "Methylation", -Rep_Name, -Rep_Family, -Rep_Class)
+
+# Reorder samples for x-axis
+Order <- c("ESC_1", "ESC_2", "ngDIO_1", "ngDIO_2", "fgDIO_1", "fgDIO_2", "ngOocyte", "fgOocyte")
+gt_df$Stage <- factor(gt_df$Stage, levels = Order)
+
+
+# whole repeats
+# violin plot
+gt_df %>% ggplot(aes(x = Stage, y = Methylation)) +
+  geom_violin(scale = "width", fill = "yellow4") +
+  scale_fill_viridis_d() +
+  ggtitle("All repeats") +
+       ylim(0,1) + xlab("") + 
+      theme_bw() +  
+  theme(text = element_text(colour = "black", family = "Helvetica"),
+        axis.text.x = element_text( hjust = 1, vjust = 0.5, angle = 90)) 
+    
+
+
+### indivisual meth of repeats
+# Class
+gt_df %>% 
+  filter(!(str_detect(Rep_Class, "\\?"))) %>%  
+  ggplot(aes(x = Stage, y = Methylation, fill = Rep_Class)) +
+  geom_violin(scale = "width") +
+  scale_fill_viridis_d() +
+      facet_rep_wrap(~Rep_Class, repeat.tick.labels = T) + 
+      ylim(0,1) + 
+      theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank()) +
+  guides(fill = FALSE) 
+
+# Family
+gt_df %>% 
+  filter(!(str_detect(Rep_Family, "\\?"))) %>%  # remove classes containing ?
+  ggplot(aes(x = Stage, y = Methylation, fill = Rep_Family)) +
+  geom_violin(scale = "width") +
+  scale_fill_viridis_d() +
+      facet_rep_wrap(~Rep_Family, repeat.tick.labels = T) + 
+      ylim(0,1) + 
+      theme_classic(base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank()) +
+  guides(fill = FALSE) 
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+#  DNA meth. dynamics of below genes
+chr17   12741000        12743000        Igf2r
+chr11   12025000        12027000        Grb10
+chr6    4747000 4749000 Peg10
+chr2    174294000       174300000       Nespas
+chr6    30737000        30739000        Mest
+chr7    60002000        60005000        Snrpn
+chr7    143295000       143297000       Kcnq1ot1
+chr18   12971000        12973000        Impact
+chr7    142574500       142576500       H19
+chr9    89855000        89860000        Rasgrf1
+chr12   109520000       109525000       Meg3
+
+# point plot
+```{r}
+ES_1 <- read.table("meth_ICR_sample_1.bed", header = F)
+
+ES_2 <- read.table("meth_ICR_sample_2.bed", header = F)
+
+ngDIO_1 <- read.table("meth_ICR_sample_3.bed", header = F)
+  
+ngDIO_2 <- read.table("meth_ICR_sample_4.bed", header = F)
+  
+fgDIO_1 <- read.table("meth_ICR_sample_5.bed", header = F)
+  
+fgDIO_2 <- read.table("meth_ICR_sample_6.bed", header = F)
+  
+ngO <- read.table("meth_ICR_sample_7.bed", header = F)
+  
+fgO <- read.table("meth_ICR_sample_8.bed", header = F)
+
+E10.5_fPGC <- read.table("meth_ICR_sample_E10.5_fPGC.bed", header = F)
+
+colnames(ES_1) <- c("chr", "start", "end", "Gene", "meth")
+colnames(ES_2) <- c("chr", "start", "end", "Gene", "meth")
+colnames(ngDIO_1) <- c("chr", "start", "end", "Gene", "meth")
+colnames(ngDIO_2) <- c("chr", "start", "end", "Gene", "meth")
+colnames(fgDIO_1) <- c("chr", "start", "end", "Gene", "meth")
+colnames(fgDIO_2) <- c("chr", "start", "end", "Gene", "meth")
+colnames(ngO) <- c("chr", "start", "end", "Gene", "meth")
+colnames(fgO) <- c("chr", "start", "end", "Gene", "meth")
+colnames(E10.5_fPGC) <- c("chr", "start", "end", "Gene", "meth")
+
+
+df <- data.frame(ESC_1 = ES_1$meth, 
+                 ESC_2 = ES_2$meth, 
+                 ngDIO_1 = ngDIO_1$meth, 
+                 ngDIO_2 = ngDIO_2$meth, 
+                 fgDIO_1 = fgDIO_1$meth, 
+                 fgDIO_2 = fgDIO_2$meth, 
+                 ngOocyte = ngO$meth, 
+                 fgOocyte = fgO$meth,
+                 E10.5_fPGC = E10.5_fPGC$meth,
+                 Gene = ES_1$Gene)
+
+
+### make dataframe
+df <- data.frame(ESC_1 = ES_1$meth, 
+                 ESC_2 = ES_2$meth, 
+                 ngDIO_1 = ngDIO_1$meth, 
+                 ngDIO_2 = ngDIO_2$meth, 
+                 fgDIO_1 = fgDIO_1$meth, 
+                 fgDIO_2 = fgDIO_2$meth, 
+                 ngOocyte = ngO$meth, 
+                 fgOocyte = fgO$meth,
+                 Gene = ES_1$Gene)
+
+
+
+# gather
+gt_df <- df %>% gather(key = "Stage", value = "Methylation", -Gene)
+
+
+# Add label
+added_stage <- c(
+  rep("ESC", 11*2),
+  rep("ngOocyte", 11*2),
+  rep("fgOocyte", 11*2),
+  rep("ngOocyte", 11),
+  rep("fgOocyte", 11)
+)
+
+added_group <- c(
+  rep("ESC/DIO", 11*6),
+  rep("in vivo", 11*2)
+)
+
+gt_df2 <- data.frame(gt_df, added_stage, added_group)
+
+
+
+
+# Reorder samples for x-axis
+Order <- c("ESC", "ngOocyte", "fgOocyte")
+gt_df2$added_stage <- factor(gt_df2$added_stage, levels = Order)
+
+# line plot of maternal meth ICR
+g1 <- gt_df2 %>% dplyr::filter(Gene !="H19", Gene !="Rasgrf1", Gene !="Meg3", Gene !="Grb10", Gene !="Peg10") %>%
+  ggplot(aes(x = added_stage, y = Methylation*100, colour = added_group, group = Gene)) +
+  geom_point()+
+  #geom_line()+
+  # facet_wrap(~Gene, nrow = 3) +
+  facet_rep_wrap(~Gene, nrow = 3, repeat.tick.labels = F) +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank(), strip.text = element_text(hjust = 0, colour = "brown3", face = "bold"), panel.grid = element_blank(), 
+        legend.position = 'none' 
+        ) +
+  xlab("") + ylab("DNA methylation (%)") +
+  ylim(0,100)
+  
+
+
+# line plot of maternal meth ICR
+g2 <- gt_df2 %>% dplyr::filter(Gene == "H19"| Gene == "Rasgrf1"| Gene == "Meg3") %>%
+  ggplot(aes(x = added_stage, y = Methylation*100, colour = added_group, group = Gene)) +
+  geom_point()+
+  #geom_line()+
+  # facet_wrap(~Gene, nrow = 3) +
+  facet_rep_wrap(~Gene, nrow = 3, repeat.tick.labels = F) +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank(), strip.text = element_text(hjust = 0, colour = "steelblue", face = "bold"), panel.grid = element_blank(), axis.text.y = element_blank(), legend.title = element_blank() 
+        ) +
+  xlab("") + ylab("") +
+  ylim(0,100)
+
+
+# align graphs by egg package
+
+ egg::ggarrange(g1, g2, ncol = 2, nrow = 1, widths = c(0.5, 0.25))
+
+
+## maternal
+gt_df2 %>% dplyr::filter(Gene !="H19", Gene !="Rasgrf1", Gene !="Meg3", Gene !="Grb10", Gene !="Peg10") %>%
+  ggplot(aes(x = added_stage, y = Methylation*100, colour = added_group, group = Gene)) +
+  geom_point()+
+  #geom_line()+
+  # facet_wrap(~Gene, nrow = 3) +
+  facet_rep_wrap(~Gene, nrow = 3, repeat.tick.labels = F) +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank(), strip.text = element_text(hjust = 0, colour = "brown3", face = "bold"), panel.grid = element_blank(), 
+       # legend.position = 'none' 
+       legend.title = element_blank() 
+        ) +
+  xlab("") + ylab("DNA methylation (%)") +
+  ylim(0,100) 
+
+## paternal
+gt_df2 %>% dplyr::filter(Gene == "H19"| Gene == "Rasgrf1"| Gene == "Meg3", added_stage != "fgOocyte") %>%
+  ggplot(aes(x = added_stage, y = Methylation*100, colour = added_group, group = Gene)) +
+  geom_point()+
+  #geom_line()+
+  # facet_wrap(~Gene, nrow = 3) +
+  facet_rep_wrap(~Gene, nrow = 3, repeat.tick.labels = F) +# lemon package
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank(), strip.text = element_text(hjust = 0, colour = "steelblue", face = "bold"), panel.grid = element_blank(),  
+        legend.title = element_blank() 
+        ) +
+  xlab("") + ylab("") +
+  ylim(0,100)
+```
+
+
+
+
+# distribution of methylation levels of each reads
+```{r}
+# load
+ds <- readxl::read_xlsx("ICR_read_meth_distribution.xlsx")
+
+ds %>%
+ggplot(aes(x = ratio*100)) +
+  geom_histogram(binwidth = 10, fill = "black")+ 
+  #facet_wrap(~Gene) +
+  facet_rep_wrap(~Gene, nrow = 3, repeat.tick.labels = F) +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), strip.background = element_blank(), strip.text = element_text(hjust = 0, colour = "brown3", face = "bold", family = "Helvetica"), 
+       ) +
+  xlab("DNA methylation levels (%)") + ylab("Frequency") 
+  
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

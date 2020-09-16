@@ -1,0 +1,76 @@
+---
+title: "PGC_Meiosis_gene_expression_DIOL"
+author: "Nobuhiko Hamazaki"
+date: "9/10/2020"
+output: html_document
+---
+```{r message=FALSE}
+library(tidyverse)
+library(RColorBrewer) 
+library(pheatmap)
+```
+
+
+# Average heatmap of specific genes
+```{r}
+mean_tpm <- read.table("table_expression_meiotic_PGC_DIO.tsv", header = T, check.names = F)
+
+
+# gene set
+Meiotic_genes <- c("Sycp1", "Sycp3", "Stra8", "Dmc1", "Spo11", "Prdm9","Dazl", "Hormad1", "Rec8")
+PGC_genes <- c("Tfap2c", "Prdm1", "Prdm14")
+
+
+
+## PGC genes
+
+fil_df <- mean_tpm %>% dplyr::filter(Geneid %in% PGC_genes)  
+
+sel_df1 <- fil_df %>%  dplyr::select(-Geneid)
+rownames(sel_df1) <- fil_df$Geneid
+
+## Meiotic genes
+fil_df <- mean_tpm %>% dplyr::filter(Geneid %in% Meiotic_genes) 
+
+sel_df2 <- fil_df %>%  dplyr::select(-Geneid)
+rownames(sel_df2) <- fil_df$Geneid
+
+
+
+
+
+# concat sel_df1 and sel_df2
+sel_df_gat <- rbind(sel_df1, sel_df2)
+
+
+
+annotation_row <- data.frame(
+  Gene_group = factor(c(
+    rep("PGC_genes", nrow(sel_df1)),
+    rep("Meiotic_genes", nrow(sel_df2))))
+  )
+
+# reorder
+annotation_row$Gene_group <- factor(annotation_row$Gene_group,  levels = c("PGC_genes", "Meiotic_genes"))
+
+rownames(annotation_row) <- rownames(sel_df_gat)
+
+my_palette <- colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100)
+
+ann_colors = list(
+Gene_group = c(PGC_genes = "#3CAEA3", Meiotic_genes = "#F6D55C")
+)
+
+
+
+pheatmap(sel_df_gat, scale = "row", cluster_col = F, cluster_rows = F,
+         color = my_palette,
+        annotation_row = annotation_row, 
+        annotation_colors = ann_colors, 
+        cellwidth = 15, 
+        cellheight = 15, 
+        gaps_col =11, 
+        gaps_row = nrow(sel_df1)
+        )
+
+```

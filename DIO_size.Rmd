@@ -1,0 +1,64 @@
+---
+title: "DIO_size"
+author: "Nobuhiko Hamazaki"
+date: "9/12/2020"
+output: html_document
+---
+---
+title: "Cell_Nuclear_size_plotting_IVD"
+author: "Nobuhiko Hamazaki"
+date: "2018/11/22"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(ggbeeswarm)
+library(readxl)
+
+```
+
+
+# Cell size plotting
+```{r}
+
+df <- readxl::read_xlsx("DIO_size.xlsx")
+
+df$Cell_type <- factor(df$Cell_type, levels = c("No_TG", "PPT8"))
+
+
+
+ df %>% dplyr::filter(NC == "Cell") %>%
+  ggplot(aes(x = Cell_type, y = Area, group = Cell_type)) +
+  geom_quasirandom(alpha = 0.6, size=1, col = "steelblue")+
+  #geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.2, size = 0.3) +
+  coord_cartesian(ylim = c(0,220)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+# scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("Cell size" ) 
+
+```
+
+
+## Nuclear size
+```{r}
+df <- readxl::read_xlsx("DIO_size.xlsx")
+
+df$Cell_type <- factor(df$Cell_type, levels = c("No_TG", "PPT8"))
+
+
+ df %>% dplyr::filter(NC == "Nucleus") %>%
+  ggplot(aes(x = Cell_type, y = Area, group = Cell_type)) +
+  geom_quasirandom(alpha = 0.6, size=1, col = "deeppink1")+
+  #geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.2, size = 0.3) +
+  coord_cartesian(ylim = c(0,120)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  ggtitle("Nuclear size" )  
+ 
+ 
+```
+ 
+ 
+ 
+ 

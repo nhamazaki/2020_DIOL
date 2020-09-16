@@ -1,0 +1,114 @@
+---
+title: "IVD_Cell_Nuclear_size_plotting"
+output: html_document
+Author: Nobuhiko Hamazaki
+---
+```{r}
+library(tidyverse)
+library(ggbeeswarm)
+library(readxl)
+```
+
+
+# Cell size plotting
+```{r}
+
+# Cell size
+df_cell <- readxl::read_xlsx("IVD_size_cell.xlsx")
+
+df_cell %>%
+  ggplot(aes(x = IVD_days, y = Area, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.75, col = "steelblue") +
+  #geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,1700)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("Cell size" ) 
+
+df_cell %>%
+  ggplot(aes(x = IVD_days, y = Area, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.75, col = "steelblue") +
+  geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,1700)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("Cell size" )  
+
+
+
+# Nuclear size
+df_nuc <- readxl::read_xlsx("IVD_size_nuclear.xlsx")
+
+df_nuc %>%
+  ggplot(aes(x = IVD_days, y = Area, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.5, col = "deeppink1") +
+  #geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,400)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("Nuclear size" ) 
+
+df_nuc %>%
+  ggplot(aes(x = IVD_days, y = Area, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.5, col = "deeppink1") +
+  geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,400)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("Nuclear size" ) 
+```
+
+
+
+# Nuclear/Cell ratio
+```{r}
+
+# Nuclear/Cell ratio
+df_NC <- readxl::read_xlsx("IVD_size_NC_ratio.xlsx")
+
+df_NC %>%
+  ggplot(aes(x = IVD_days, y = N_C, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.75, col = "seagreen") +
+  #geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("N/C ratio (area)" )  
+
+## with boxplot
+df_NC %>%
+  ggplot(aes(x = IVD_days, y = N_C, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.75, col = "seagreen") +
+  geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("N/C ratio (area)" )  
+
+
+
+# volume
+df_NC %>%
+  ggplot(aes(x = IVD_days, y = sqrt(N_C)^3, group = IVD_days)) +
+  geom_quasirandom(alpha = 0.6, size=0.75, col = "seagreen") +
+  #geom_boxplot(alpha = 0.3) +
+  stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median, geom = "crossbar", width = 0.75, size = 0.3) +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_classic(base_size = 12, base_family = "Helvetica") + 
+  scale_x_continuous(breaks=seq(3,17,by=2)) +
+  ggtitle("N/C ratio (volume)" )  
+
+
+
+```
+
+
+
+
+

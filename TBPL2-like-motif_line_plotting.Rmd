@@ -1,0 +1,127 @@
+---
+title: "TBPL2-like_motif_line_plotting"
+author: "Nobuhiko Hamazaki"
+date: "9/9/2020"
+output: html_document
+---
+
+```{r message=FALSE}
+# loding libraries
+library(Biostrings)     # Provides DNAString, DNAStringSet, etc
+library(BSgenome)       # Provides getSeq()
+library(GenomicRanges)  # Provides GRanges, etc
+library(rtracklayer)    # Provides import() and export()
+library(org.Mm.eg.db)
+library(AnnotationDbi)
+library(tidyverse)
+library(lemon)
+library(seqPattern)
+
+```
+
+
+
+
+# matching pwm and line plot of motif 2 (TBP)
+```{r}
+# parameters
+up <- 100
+down <- 100
+stage1 <- "IVD_D11"
+stage2 <- "IVD_D13"
+fold <- 4
+
+
+##############
+############## reference data ############
+# retrieving GRange object of mm10
+# biocLite("TxDb.Mmusculus.UCSC.mm10.knownGene")
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+# loading mm10 genome
+library(BSgenome.Mmusculus.UCSC.mm10)
+# load transcript GRange object
+Txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+# Retrieving gene GRange
+mm10_genes <- genes(Txdb)
+# Retrieving all promter GRange (100 nt)
+mm10_promoters <- promoters(mm10_genes, upstream = up, downstream = down) # <-promoter range
+mm10_promoters_50nt <- promoters(mm10_genes, upstream = 50, downstream = 0) # for pwm enrichment
+### get sequences for all the promoters
+all.promoter_seq <- getSeq(Mmusculus, mm10_promoters)
+
+##########################################
+
+
+# loading MEs genes 
+df <- read.table("All.MEs_expression.csv", header = T, sep = ",", check.names = F)
+
+# rename colnames
+colnames(df) <- c("Geneid", colnames(df[,-1]))
+mygenes <- as.character(df$Geneid)
+
+# Retrieving Entrez_id of your genes of interest
+g.ids <- AnnotationDbi::select(org.Mm.eg.db, keys=mygenes,columns=c("ENTREZID"), keytype="ALIAS")
+
+#### since we have a one-to-many mapping, the match function gave us the first match i.e. just taking the first match in the g.ids object.
+idx <- match(mygenes, g.ids$ALIAS)
+
+no.dup.g.ids <- g.ids[idx,]
+
+n.d.df <- cbind(df, no.dup.g.ids) 
+
+# extracting promoter GRange object of your genes by Entrez id ( instead of ==, here, %in% should be used, otherwise it fails)
+stage1_plus1 <- n.d.df %>% dplyr::select(stage1)  %>% +1 
+stage2_plus1 <- n.d.df %>% dplyr::select(stage2)  %>% +1 
+
+
+# define fold changes
+up_condition <- stage2_plus1 / stage1_plus1 > fold
+down_condition <- stage2_plus1 / stage1_plus1 < 1/fold
+
+
+up_goi_pro <- subset(mm10_promoters, gene_id %in% n.d.df[up_condition,]$ENTREZID)
+down_goi_pro <- subset(mm10_promoters, gene_id %in% n.d.df[down_condition,]$ENTREZID)
+
+head(n.d.df[up_condition,])
+head(n.d.df[down_condition,])
+
+### get promoter sequences (DNA string) for goi 
+up_promoter_seq <- getSeq(Mmusculus, up_goi_pro)
+down_promoter_seq <- getSeq(Mmusculus, down_goi_pro)
+
+############
+#promoter seq for pwm enrichment analysis
+up_goi_pro_50nt <- subset(mm10_promoters_50nt, gene_id %in% n.d.df[up_condition,]$ENTREZID)
+down_goi_pro_50nt <- subset(mm10_promoters_50nt, gene_id %in% n.d.df[down_condition,]$ENTREZID)
+
+### get promoter sequences (DNA string) for goi 
+up_promoter_seq_50nt <- getSeq(Mmusculus, up_goi_pro_50nt)
+down_promoter_seq_50nt <- getSeq(Mmusculus, down_goi_pro_50nt)
+##########
+
+
+ 
+
+# MEMEcount matrix
+ppm <- read.table("motif_2_counts.txt") 
+
+colnames(ppm) <- c("A", "C", "G", "T")
+
+pwm <- PWM(t(ppm))
+
+# plot average motif occurrence profile for up promoters
+plotMotifOccurrenceAverage(regionsSeq = up_promoter_seq, motifPWM = pwm, minScore = "80%", smoothingWindow = 5, color = c("red3"), cex.axis = 0.9, lwd =1.5)
+
+# add average motif occurrence profile for down promoters to the existing plot
+plotMotifOccurrenceAverage(regionsSeq = down_promoter_seq, motifPWM = pwm, minScore = "80%", smoothingWindow = 5, color = c("blue3"), add = T,  lwd = 1.5)
+
+# add average motif occurrence profile for all promoters to the existing plot
+plotMotifOccurrenceAverage(regionsSeq = all.promoter_seq, motifPWM = pwm, minScore = "80%", smoothingWindow = 5, color = c("black"), add = T,  lwd = 1.5)
+
+
+legend("topright", legend = c("up", "down", "all"), col = c("red3", "blue3", "black"), bty = "n", lwd = 2)
+
+dev.off()
+
+
+```

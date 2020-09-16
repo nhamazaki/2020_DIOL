@@ -1,0 +1,417 @@
+---
+title: "IVD_repeat_counting_visualization"
+author: "Nobuhiko Hamazaki"
+date: "2018/5/29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(pheatmap)
+library(RColorBrewer)
+library(lemon)
+library(stringr)
+
+```
+
+
+# reading data for merged table productiopn
+
+```{r}
+
+# loading repeats expression table 
+
+##### Class
+rpm.Class <- read.table("repeats_Class_RPM_KO.tsv", header = T, check.names = F) 
+
+##### Family
+rpm.Family <- read.table("repeats_Family_RPM_KO.tsv", header = T, check.names = F) 
+
+##### Name
+rpm.Name <- read.table("repeats_Name_RPM_KO.tsv", header = T, check.names = F)
+
+
+# annotation
+days <- colnames(rpm.Class) %>% str_sub(4,6)
+
+
+```
+
+
+
+
+# boxplot of specific Class
+```{r}
+# long format
+g_rpm_Class <- rpm.Class %>% data.frame(., Geneid = rownames(rpm.Class), check.names = F) %>% gather(key = genotype, value = RPM, -Geneid) 
+
+# removing unnecessary characters
+stage <- g_rpm_Class$genotype %>% str_sub(start = 4, end = 6) 
+
+genotype <- g_rpm_Class$genotype %>% str_sub(start = 8, end = -6) 
+
+# formatting
+g_Class <- data.frame(repeats = g_rpm_Class$Geneid, stage = stage, genotype = genotype, RPM = g_rpm_Class$RPM) 
+
+g_Class %>% dplyr::filter(repeats == "LTR" | repeats == "LINE"| repeats == "SINE") %>% ggplot(aes(x = genotype, y = RPM)) +
+  geom_boxplot() +
+  facet_grid(repeats ~ stage,scales="free", space="free_x")+ 
+  theme_bw(base_size = 12, base_family = "Helvetica")+
+  theme(axis.text.x = element_text(colour = "black", hjust = 1, vjust = 0.5, angle = 90)) +
+  ylab("total RPM")
+
+g_Class %>% dplyr::filter(repeats == "LTR") %>% ggplot(aes(x = genotype, y = RPM)) +
+  geom_boxplot() +
+  facet_grid(repeats ~ stage,scales="free", space="free_x")+ 
+  theme_bw(base_size = 12, base_family = "Helvetica")+
+  theme(axis.text.x = element_text(colour = "black", hjust = 1, vjust = 0.5, angle = 90)) +
+  ylab("total RPM") 
+```
+
+# boxplot of specific Family
+```{r}
+
+# long format
+g_rpm_Family <- rpm.Family %>% data.frame(., Geneid = rownames(rpm.Family), check.names = F) %>% gather(key = genotype, value = RPM, -Geneid) 
+
+# removing unnecessary characters
+stage <- g_rpm_Family$genotype %>% str_sub(start = 4, end = 6) 
+
+genotype <- g_rpm_Family$genotype %>% str_sub(start = 8, end = -6) 
+
+# formatting
+g_Family <- data.frame(repeats = g_rpm_Family$Geneid, stage = stage, genotype = genotype, RPM = g_rpm_Family$RPM) 
+
+g_Family %>% dplyr::filter(repeats == "ERVK" | repeats == "ERVL-MaLR") %>% ggplot(aes(x = genotype, y = RPM)) +
+  geom_boxplot() +
+  facet_grid(repeats ~ stage,scales="free", space="free_x")+ 
+  theme_bw(base_size = 12, base_family = "Helvetica")+
+  theme(axis.text.x = element_text(colour = "black", hjust = 1, vjust = 0.5, angle = 90)) +
+  ylab("total RPM") 
+
+
+```
+
+
+# boxplot of specific Name
+```{r}
+# long format
+g_rpm_Name <- rpm.Name %>% data.frame(., Geneid = rownames(rpm.Name), check.names = F) %>% gather(key = genotype, value = RPM, -Geneid) 
+
+# removing unnecessary characters
+stage <- g_rpm_Name$genotype %>% str_sub(start = 4, end = 6) 
+
+genotype <- g_rpm_Name$genotype %>% str_sub(start = 8, end = -6) 
+
+# formatting
+g_Name <- data.frame(repeats = g_rpm_Name$Geneid, stage = stage, genotype = genotype, RPM = g_rpm_Name$RPM) 
+
+g_Name %>% dplyr::filter(repeats == "RLTR10-int" |repeats == "RLTR10" | repeats == "MTA_Mm"| repeats == "MTA_Mm-int") %>% ggplot(aes(x = genotype, y = RPM)) +
+  geom_boxplot() +
+  facet_grid(repeats ~ stage,scales="free", space="free_x")+ 
+  theme_bw(base_size = 12, base_family = "Helvetica")+
+  theme(axis.text.x = element_text(colour = "black", hjust = 1, vjust = 0.5, angle = 90)) +
+  ylab("total RPM") 
+
+
+
+```
+
+
+
+# Visualizing repeat expression dynamics during oogenesis
+
+# Repeat class expression
+```{r}
+# loading
+g_Class_CPM <- read.table("IVD_repeat_Class.tsv")
+
+# reorder
+Order <- c( "IVD.D5", "IVD.D7", "IVD.D9", "IVD.D11", "IVD.D13", "IVD.D15", "IVD.D17")
+
+
+# heatmap
+ggplot(g_Class_CPM, aes(x=Samples, y=Repeats, group = Repeats)) +
+  geom_tile(aes(fill=CPM), colour="white") + scale_fill_gradient(low="white", high="brown") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.7)) +
+  scale_x_discrete(limits = Order) +
+  xlab("") +
+  ylab("") +
+  theme_bw(base_size = 9, base_family = "") +
+  theme(panel.background = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_blank() , panel.border = element_blank(), axis.text.x = element_text(size = 12,angle = 90, hjust = 1, vjust = 0.7), axis.text.y = element_text(size = 12))
+
+# boxplot for each repeat class
+
+g_Class_CPM %>% dplyr::filter(Repeats == "LTR") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("LTR") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank() ,
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+g_Class_CPM %>% dplyr::filter(Repeats == "LINE") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#00AFBB") +
+  ggtitle("LINE") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+g_Class_CPM %>% dplyr::filter(Repeats == "SINE") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "cornflowerblue") +
+  ggtitle("SINE") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+# combined figure
+
+g_Class_CPM %>% dplyr::filter(Repeats == "LTR" | Repeats == "LINE" | Repeats == "SINE") %>% 
+  ggplot(aes(x=Samples, y=Repeats, fill = Repeats)) +
+  facet_rep_grid(rows = vars(Repeats), scales = "free") + 
+  geom_boxplot(aes(x=Samples, y=CPM)) +
+  scale_fill_brewer(palette = "Dark2" ) +
+  ggtitle("Rep.Class") +
+  xlab("") + 
+  ylab("CPM") +
+  scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+```
+
+# Repeat Family plotting
+```{r}
+
+# loading
+g_Family_CPM <- read.table("IVD_repeat_Family.tsv")
+
+
+# heatmap
+ggplot(g_Family_CPM, aes(x=Samples, y=Repeats, group = Repeats)) +
+  geom_tile(aes(fill=CPM), colour="white") + scale_fill_gradient(low="white", high="brown") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.7)) +
+  scale_x_discrete(limits = Order) +
+  xlab("") +
+  ylab("") +
+  theme_bw(base_size = 9, base_family = "") +
+  theme(panel.background = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_blank() , panel.border = element_blank(), axis.text.x = element_text(size = 12,angle = 90, hjust = 1, vjust = 0.7), axis.text.y = element_text(size = 12))
+
+# boxplot for specific Family
+
+# reorder
+Order <- c( "IVD.D5", "IVD.D7", "IVD.D9", "IVD.D11", "IVD.D13", "IVD.D15", "IVD.D17")
+
+g_Family_CPM %>% dplyr::filter(Repeats == "ERVK") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("ERVK") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank() ,
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+g_Family_CPM %>% dplyr::filter(Repeats == "L1") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("L1") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+g_Family_CPM %>% dplyr::filter(Repeats == "ERVL-MaLR") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("ERVL−MaLR") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+# combined figure
+
+g_Family_CPM %>% dplyr::filter(Repeats == "ERVL-MaLR" | Repeats == "ERVK") %>% 
+  ggplot(aes(x=Samples, y=Repeats)) +
+  facet_rep_grid(rows = vars(Repeats), scales = "free") + 
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("Rep.Family") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+```
+
+
+
+# Repeat name plotting
+```{r}
+
+# loading
+g_Name_CPM <- read.table("IVD_repeat_Name.tsv")
+
+# heatmap
+ggplot(g_Name_CPM, aes(x=Samples, y=Repeats, group = Repeats)) +
+  geom_tile(aes(fill=CPM), colour="white") + scale_fill_gradient(low="white", high="brown") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.7)) +
+  scale_x_discrete(limits = Order) +
+  xlab("") +
+  ylab("") +
+  theme_bw(base_size = 9, base_family  = "") +
+  theme(panel.background = element_blank(), panel.grid.minor = element_blank(), axis.ticks = element_blank() , panel.border = element_blank(), axis.text.x = element_text(size = 12,angle = 90, hjust = 1, vjust = 0.5), axis.text.y = element_text(size = 2))
+
+# boxplot for specific Names
+
+# reorder
+Order <- c( "IVD.D5", "IVD.D7", "IVD.D9", "IVD.D11", "IVD.D13", "IVD.D15", "IVD.D17")
+
+g_Name_CPM %>% dplyr::filter(Repeats == "RLTR10-int") %>% 
+  ggplot(aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("RLTR10-int") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank() ,
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+g_Name_CPM %>% dplyr::filter(Repeats == "MTA_Mm-int") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("MTA_Mm-int") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+g_Name_CPM %>% dplyr::filter(Repeats == "MT-int") %>% 
+  ggplot( aes(x=Samples, y=Repeats)) +
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("MT-int") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+# combined figure
+
+g_Name_CPM %>% dplyr::filter(Repeats == "RLTR10-int" | Repeats == "MT-int" | Repeats == "MTA_Mm-int") %>% 
+  ggplot(aes(x=Samples, y=Repeats)) +
+  facet_rep_grid(rows = vars(Repeats), scales = "free") + 
+  geom_boxplot(aes(x=Samples, y=CPM), fill= "#E7B800") +
+  ggtitle("Rep.Name") +
+  xlab("") + 
+    ylab("CPM") +
+    scale_x_discrete(limits = Order) +
+  theme_classic(base_size = 12, base_family = "") +
+  theme(plot.title = element_text(size = 20, face = "bold"),
+        axis.text.x = element_text(size =16, angle = 90, hjust = 1, vjust = 0.7),
+        axis.text.y = element_text(size = 14),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border = element_blank()) +
+  ylab("total RPM") 
+
+
+
+```
