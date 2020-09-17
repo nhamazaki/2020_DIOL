@@ -1,0 +1,262 @@
+---
+title: "PPT_criteria_in_KO"
+author: "Nobuhiko Hamazaki"
+date: "8/30/2019"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(RColorBrewer)
+library(pheatmap)
+
+```
+
+
+
+
+# (KO) dot plot of AT vs GC 
+```{r}
+
+sel_df <- read.table("KO_tpm_mean.tsv", header = T)
+
+##### gathering TPM table
+long_df <- sel_df %>% gather(key = stage, value = TPM, -Geneid, -A_count, -T_count, -G_count, -C_count)
+
+
+### AT ratio
+AT_high <- long_df[long_df$A_count + long_df$T_count > median(long_df$A_count + long_df$T_count) + 10,]
+AT_low <- long_df[long_df$A_count + long_df$T_count < median(long_df$A_count + long_df$T_count) - 10,]
+
+mZ_AT_high <- AT_high %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_TPM = mean(TPM))
+
+mZ_AT_low <- AT_low %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_TPM = mean(TPM))
+
+# dividing high values by low value
+AT_hi_lo <- data_frame(Promoter_nucleotide = "AT", stage = mZ_AT_high$stage , high_per_low = (mZ_AT_high$mean_TPM-mZ_AT_low$mean_TPM) )
+
+# scaling
+AT_hi_lo$high_per_low <- scale(AT_hi_lo$high_per_low)
+
+### GC
+GC_high <- long_df[long_df$G_count + long_df$C_count > median(long_df$G_count + long_df$C_count) + 10,]
+
+GC_low <- long_df[long_df$G_count + long_df$C_count < median(long_df$G_count + long_df$C_count) - 10,]
+
+mZ_GC_high <- GC_high %>% na.omit() %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_TPM = mean(TPM))
+
+
+mZ_GC_low <- GC_low %>%na.omit() %>% na.omit() %>% as_tibble() %>%
+   group_by(stage, add = F) %>%
+   summarise(mean_TPM = mean(TPM))
+
+#  # dividing high values by low value
+GC_hi_lo <- data_frame(Promoter_nucleotide = "GC", stage = mZ_GC_high$stage , high_per_low = (mZ_GC_high$mean_TPM - mZ_GC_low$mean_TPM) )
+
+# scaling
+GC_hi_lo$high_per_low <- scale(GC_hi_lo$high_per_low)
+
+
+    # merging two tables
+ALL_hi_low <- rbind(AT_hi_lo, GC_hi_lo)
+
+
+# reorder
+my_Order <- c("d11_WT", "d13_WT","d11_KO_Figla","d11_KO_Lhx8","d11_KO_Sub1","d11_KO_Stat3", "d13_KO_Nobox", "d13_KO_Tbpl2", "d13_KO_Sohlh1", "d13_KO_Dynll1", "d13_KO_Ell3", "d13_KO_Hes6", "d13_KO_Foxr1", "d13_KO_Mef2b", "d13_KO_Kdm1b", "d13_KO_Ccnk","d13_KO_Noto","d13_KO_Sfr1", "d13_KO_Tcf25", "d13_KO_Ybx3", "d13_KO_Thap7")
+ALL_hi_low$stage <- factor(ALL_hi_low$stage, levels = my_Order)
+
+
+ALL_hi_low %>% ggplot(aes(x=stage, y = Promoter_nucleotide)) +
+  geom_point(aes(colour = high_per_low), size = 4) +
+  scale_colour_gradient2(low = "steelblue", mid = "white", high = "red", midpoint = 0) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5, hjust = 1, size = 12), axis.title.x = element_blank(), axis.title.y = element_blank(), legend.text = element_text(size = 8), legend.title = element_text(size = 10), plot.margin= unit(c(7, 1, 1, 1), "lines")) +
+  labs(colour = "high/low")
+
+
+# fliping
+ALL_hi_low$stage <- factor(ALL_hi_low$stage, levels = rev(my_Order))
+
+ALL_hi_low %>% ggplot(aes(x=stage, y = Promoter_nucleotide)) +
+  geom_point(aes(colour = high_per_low), size = 4) +
+  scale_colour_gradient2(low = "steelblue", mid = "white", high = "red", midpoint = 0) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90,vjust = 0.5, hjust = 1, size = 12), axis.title.x = element_blank(), axis.text.y = element_text( size = 8), axis.title.y = element_blank(), legend.text = element_text(size = 8), legend.title = element_text(size = 10), plot.margin = unit(c(5, 1, 1, 1), "lines"))  +
+  labs(colour = "high/low" )+ 
+  coord_flip() 
+
+
+
+```
+
+
+
+
+
+# X/A ratio
+# Calcurating X chromosomal expression
+```{r out.height= 1000, out.width= 8000}
+# Merging with bed table for ataching chr information
+
+# Laoding information from bed file
+bed <- readr::read_delim("RefSeq_name.bed", delim = "\t",col_names = c("chr","Start","End","Geneid", "Strand")) %>% dplyr::filter(!grepl("Un|random",chr))
+
+sel_df2 <- sel_df %>% select(-contains("count"))
+
+# joining by inner_join and removing dups by distinct
+tpm.bed <- dplyr::inner_join(x= sel_df2, y=bed, by = "Geneid") %>%
+  dplyr::distinct(Geneid, .keep_all = T)
+
+
+# gathering for long format
+mgxp <- tpm.bed  %>% 
+  gather(stage, TPM, -Geneid, -chr, -Start, -End, -Strand)
+
+
+ 
+# X/A ratio calculation
+X.link <- mgxp[mgxp$chr=="chrX",]
+
+A.link <- mgxp %>% 
+  dplyr::filter(chr != "chrX" & chr!= "chrY")
+
+# Calc. sum values
+X_sum <- X.link[,6:7] %>% group_by(stage) %>% summarise_all(funs(sum))
+A_sum <- A.link[,6:7] %>% group_by(stage) %>% summarise_all(funs(sum))
+
+# Calc. X/A ratio
+XperA_sum <- X_sum[,2]/A_sum[,2]
+# adding stage column
+XAsum <- data.frame(XperA_sum, A_sum[,1]) 
+
+XAsum$TPM <-  XAsum$TPM * 19
+
+ # reorder the orders for plotting
+ my_Order <- c("d11_WT", "d13_WT","d11_KO_Figla","d11_KO_Lhx8","d11_KO_Sub1","d11_KO_Stat3", "d13_KO_Nobox", "d13_KO_Tbpl2", "d13_KO_Sohlh1", "d13_KO_Dynll1", "d13_KO_Ell3", "d13_KO_Hes6", "d13_KO_Foxr1", "d13_KO_Mef2b", "d13_KO_Kdm1b", "d13_KO_Ccnk","d13_KO_Noto","d13_KO_Sfr1", "d13_KO_Tcf25", "d13_KO_Ybx3", "d13_KO_Thap7")
+
+
+ # reorder
+XAsum$stage <- factor(XAsum$stage, levels = my_Order)
+factor(XAsum$stage)
+
+ggplot(XAsum, aes(x=stage, y=TPM)) +
+  geom_point(size = 2.5) +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  ylim(c(0, 1.2)) +
+  ggtitle("X/A ratio") +
+  ylab("X/A ratio") +
+  geom_abline(col = "red", intercept = 0.5, slope = 0, size = 0.1)
+
+
+       
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# LTR expression
+```{r}
+# 読み込み 
+# made in R006.1_repeat...
+df <- read.table("~/Dropbox/deep-seq_data/Hamazaki_RNA_2018/Tables/repeats/2019_recount/Merged_rep_table.txt", header = T, check.names = F)
+
+
+rep_rpm <- df %>%
+  dplyr::select(Geneid, Repeat_type, 
+                contains("WT"),
+                contains("KO"),
+                -contains("d11_KO_Nobox"),
+                -contains("IVD")
+  ) 
+
+
+
+# gather
+g_rep_rpm <- rep_rpm %>%  gather(key = stage, value = RPM, -Geneid, -Repeat_type)
+
+# stageの後ろの5文字(rep___)を消す
+g_rep_rpm$stage <- g_rep_rpm$stage %>% str_sub(start = 1, end = -6) 
+
+# average table
+mean_rpm <- g_rep_rpm %>% as_tibble() %>%
+  group_by(Geneid, Repeat_type, stage) %>%
+  summarise(mean_RPM =  mean(RPM)) %>%
+  tidyr::spread(key = stage, value = mean_RPM)
+
+
+# repeat select
+sel_mean_rpm1 <- mean_rpm %>% dplyr::filter(Geneid == "LTR", Repeat_type == "Class") 
+sel_mean_rpm2 <- mean_rpm %>% dplyr::filter(Geneid == "ERVK" | Geneid == "ERVL-MaLR")
+sel_mean_rpm3 <- mean_rpm %>% dplyr::filter(Geneid == "MT-int" | Geneid == "MTA_Mm-int" | Geneid == "RLTR10-int")
+sel_mean_rpm <- bind_rows(sel_mean_rpm1, sel_mean_rpm2,sel_mean_rpm3)
+
+# row nameのついたマトリックスに変換
+mean_mx_rpm <- as.matrix(sel_mean_rpm[,c(-1,-2)])
+rownames(mean_mx_rpm) <- sel_mean_rpm$Geneid
+
+# rep_type情報を別objectに格納しておく
+rep_type <- sel_mean_rpm$Repeat_type
+
+
+#com <- data.frame(mean_mx_rpm, rep_type) 
+#com$rep_type <- as.character(com$rep_type)
+#class(com$rep_type)
+
+# 各variableのサイドバーの色を指定
+# RcolorBrewerの色を参考にした
+# colorRampPalette(rev(brewer.pal(n = 6, name = "Spectral")))(6)
+#annotation_colors <- list(
+#  rep_type = c(Class = "#3288BD",
+#            Family = "#99D594",
+#            Name = "#E6F598")
+#  )
+
+
+# heatmap
+mean_mx_rpm %>%  
+  pheatmap( cluster_cols = F, cluster_rows = F, cellwidth = 15, cellheight = 15, scale = "row", gaps_col = 5, gaps_row = c(1,3))
+
+
+
+
+```
+
+
+
+
+

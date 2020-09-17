@@ -1,0 +1,95 @@
+---
+title: "IVD_Xchr_expression"
+author: "Nobuhiko Hamazaki"
+date: "2018/6/28"
+output: html_document
+---
+
+#### Calcurating X/A ratio
+
+```{R message=FALSE}
+# libs
+library(RColorBrewer) 
+library(colorspace) 
+library(gplots) 
+library(tidyverse)
+```
+
+
+# vitro X chromosome activity calc.
+```{r, echo=FALSE}
+
+vitro_df <- read.table("TPM_table.tsv", header = T, sep = "\t")
+
+# Merging with bed table for ataching chr information
+  
+# Adding information from bed file
+bed <- readr::read_delim("RefSeq_name.bed", delim = "\t",col_names = c("chr","Start","End","Geneid", "Strand")) %>% dplyr::filter(!grepl("Un|random",chr))
+
+# joining by inner_join and removing dups by distinct
+tpm.bed <- dplyr::inner_join(x=vitro_df, y=bed, by = "Geneid") %>%
+  dplyr::distinct(Geneid, .keep_all = T)
+
+
+# gathering for long format
+mgxp <- tpm.bed  %>% gather(stage, TPM, -Geneid, -chr, -Start, -End, -Strand)
+
+
+# Calcurating chromosomal expression
+
+my_cols <- c(rep("cornflowerblue", 6), rep("black", 2),  rep("cornflowerblue", 28), rep("black", 2), rep("gray", 86))
+
+# calc. X-chr expression
+X.link <- mgxp[mgxp$chr=="chrX",]
+
+# calc. Autosomal expression
+A.link <- mgxp %>% 
+  dplyr::filter(chr != "chrX" & chr!= "chrY")
+  
+
+
+# X/A ratio calculation
+
+#Calc. sum values
+X_sum <- X.link[,6:7] %>% group_by(stage) %>% summarise_all(funs(sum))
+A_sum <- A.link[,6:7] %>% group_by(stage) %>% summarise_all(funs(sum))
+
+# Calc. X/A ratio
+XperA_sum <- X_sum[,2]/A_sum[,2]
+# adding stage column
+XAsum <- data.frame(XperA_sum, A_sum[,1])
+
+XAsum$TPM <-  XAsum$TPM * 19
+
+# remove character like "rep1"
+XAsum$stage <- XAsum$stage %>% str_sub(start = 0, end = -6) 
+
+# define orders
+my_order <- c("vitro_ES", "vitro_PGC_d6", "vitro_PGC_agg3", "IVD.D5", "IVD.D7", "IVD.D9", "IVD.D10", "IVD.D11", "IVD.D13", "IVD.D15", "IVD.D17", "IVD.D20", "vitro_2nd", "vitro_MII")
+
+# reorder
+XAsum$stage <- factor(XAsum$stage, levels = my_order)
+
+
+
+ggplot(XAsum, aes(x=stage, y=TPM)) +
+  geom_point(col = "grey4", size = 3, alpha = 0.6) +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+        axis.title.x = element_blank()) +
+  ylim(c(0, 1)) +
+  ggtitle("X/A ratio") +
+  ylab("X/A ratio") +
+  geom_abline(intercept = 0.5, slope = 0, col = "brown", size=0.2)
+
+ggplot(XAsum, aes(x=stage, y=TPM)) +
+  geom_boxplot(fill = "black") +
+  theme_classic(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  ylim(c(0, 1)) +
+  ggtitle("X/A ratio") +
+  ylab("X/A ratio") +
+  geom_abline(intercept = 0.5, slope = 0, col = "red", size=0.1)
+
+
+```
